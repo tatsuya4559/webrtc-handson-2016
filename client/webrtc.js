@@ -81,6 +81,20 @@ function prepareNewConnection(isOffer) {
     }
   };
 
+  peer.oniceconnectionstatechange = () => {
+    console.log(`ICE connection status has changed to ${peer.iceConnectionState}`);
+    switch(peer.iceConnectionState) {
+      case 'closed':
+      case 'failed':
+        if(peerConnection){
+          hangUp();
+        }
+        break;
+      case 'disconnected':
+        break;
+    }
+  }
+
   if (localStream) {
     console.log("Adding local stream...");
     // RTCPeerConnection.addTrackでストリームのトラックを入れるとペアに送られる
@@ -184,4 +198,22 @@ async function setAnswer(sessionDescription) {
   } catch (err) {
     console.error(`Error at setRemoteDescription(answer): ${err}`);
   }
+}
+
+function hangUp() {
+  if (peerConnection) {
+    if(peerConnection.iceConnectionState !== 'closed'){
+      peerConnection.close();
+      peerConnection = null;
+      cleanupVideoElement(remoteVideo);
+      textForSendSdp.value = '';
+      return;
+    }
+  }
+  console.log('peerConnection is closed');
+}
+
+function cleanupVideoElement(element) {
+  element.pause();
+  element.srcObject = null;
 }
