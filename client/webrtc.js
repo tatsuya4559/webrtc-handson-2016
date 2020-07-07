@@ -4,7 +4,6 @@ const textForSendSdp = document.getElementById("text_for_send_sdp");
 const textToReceiveSdp = document.getElementById("text_for_receive_sdp");
 let localStream = null;
 let peerConnection = null;
-// let negotiationneededCounter = 0; // chomeの仕様への対策。最新なら治っているはず
 let isOffer = false;
 
 async function startVideo() {
@@ -67,7 +66,7 @@ function prepareNewConnection(isOffer) {
 
   peer.onnegotiationneeded = async () => {
     try {
-      if (isOffer /* && negotiationneededCounter === 0*/) {
+      if (isOffer) {
         let offer = await peer.createOffer(); // SDPのoffer側接続情報を生成
         console.log("createOffer() success in promise");
 
@@ -76,7 +75,6 @@ function prepareNewConnection(isOffer) {
         console.log("setLocalDescription() success in promise");
 
         sendSdp(peer.localDescription);
-        // negotiationneededCounter++;
       }
     } catch (err) {
       console.error(`Error at setLocalDescription(offer): ${err}`);
