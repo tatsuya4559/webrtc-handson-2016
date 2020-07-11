@@ -58,9 +58,10 @@ function prepareNewConnection(isOffer) {
   peer.onicecandidate = (ev /*icecandidate event */) => {
     if (ev.candidate) {
       console.log(ev.candidate);
+      sendIceCandidate(ev.candidate);
     } else {
       console.log("empty ice event");
-      sendSdp(peer.localDescription);
+      // sendSdp(peer.localDescription);
     }
   };
 
@@ -82,18 +83,20 @@ function prepareNewConnection(isOffer) {
   };
 
   peer.oniceconnectionstatechange = () => {
-    console.log(`ICE connection status has changed to ${peer.iceConnectionState}`);
-    switch(peer.iceConnectionState) {
-      case 'closed':
-      case 'failed':
-        if(peerConnection){
+    console.log(
+      `ICE connection status has changed to ${peer.iceConnectionState}`
+    );
+    switch (peer.iceConnectionState) {
+      case "closed":
+      case "failed":
+        if (peerConnection) {
           hangUp();
         }
         break;
-      case 'disconnected':
+      case "disconnected":
         break;
     }
-  }
+  };
 
   if (localStream) {
     console.log("Adding local stream...");
@@ -114,8 +117,11 @@ function prepareNewConnection(isOffer) {
 function sendSdp(sessionDescription) {
   console.log("--- sending sdp ---");
   textForSendSdp.value = sessionDescription.sdp;
-  textForSendSdp.focus();
-  textForSendSdp.select();
+  // textForSendSdp.focus();
+  // textForSendSdp.select();
+  const message = JSON.stringify(sessionDescription);
+  console.log(`sending SDP: ${message}`);
+  ws.send(message);
 }
 
 function connect() {
@@ -139,7 +145,7 @@ async function makeAnswer() {
 
     await peerConnection.setLocalDescription(answer);
     console.log("setLocalDescription() success in promise");
-    sendSdp(peerConnection.setLocalDescription);
+    sendSdp(peerConnection.localDescription);
   } catch (err) {
     console.error(err);
   }
@@ -202,18 +208,78 @@ async function setAnswer(sessionDescription) {
 
 function hangUp() {
   if (peerConnection) {
-    if(peerConnection.iceConnectionState !== 'closed'){
+    if (peerConnection.iceConnectionState !== "closed") {
       peerConnection.close();
       peerConnection = null;
+      const message = JSON.stringify({ type: "close" });
+      console.log("sending close message");
+      ws.send(message);
       cleanupVideoElement(remoteVideo);
-      textForSendSdp.value = '';
+      textForSendSdp.value = "";
+      textToReceiveSdp.value = "";
       return;
     }
   }
-  console.log('peerConnection is closed');
+  console.log("peerConnection is closed");
 }
 
 function cleanupVideoElement(element) {
   element.pause();
   element.srcObject = null;
+}
+
+const wsUrl = "ws://localhost:3001";
+const ws = new WebSocket(wsUrl);
+ws.onopen = (ev) => {
+  console.log("ws open()");
+};
+
+ws.onerror = (err) => {
+  console.error(`Error at ws onerror() : ${err}`);
+};
+
+ws.onmessage = (ev) => {
+  console.log(`ws onmessage() data: ${ev.data}`);
+  const message = JSON.parse(ev.data);
+  switch (message.type) {
+    case "offer":
+      console.log("Recieved offer ...");
+      textToReceiveSdp.value = message.sdp;
+      setOffer(message);
+      break;
+    case "answer":
+      console.log("Recieved answer ...");
+      textToReceiveSdp.value = message.sdp;
+      setAnswer(message);
+      break;
+    case "candidate":
+      console.log("Recieved ICE candidate ...");
+      const candidate = new RTCIceCandidate(message.ice);
+      console.log(candidate);
+      addIceCandidate(candidate);
+      break;
+    case 'close':
+      console.log('peer is closed...');
+      hangUp();
+      break;
+    default:
+      console.log("Invalid message");
+      break;
+  }
+};
+
+function addIceCandidate(candidate) {
+  if (peerConnection) {
+    peerConnection.addIceCandidate(candidate);
+  } else {
+    console.error("PeerConnection does not exist");
+    return;
+  }
+}
+
+function sendIceCandidate(candidate) {
+  console.log("--- sending ICE candidate ---");
+  const message = JSON.stringify({ type: "candidate", ice: candidate });
+  console.log(`sending candidate: ${message}`);
+  ws.send(message);
 }

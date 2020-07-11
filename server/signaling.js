@@ -11,6 +11,7 @@ wsServer.on("connection", (ws) => {
       if (isSame(ws, client)) {
         console.log("skip sender");
       } else {
+        console.log(`sending message: ${message}`);
         client.send(message);
       }
     });
@@ -22,4 +23,3 @@ function isSame(ws1, ws2) {
 }
 
 console.log(`websocket server started on port: ${port}`);
-
